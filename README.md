@@ -22,3 +22,15 @@ Tech Stack:
 - JavaScript
 - Pandas
 - ReportLab
+
+## Project Structure
+
+expense-tracker-flask/
+├── app.py
+├── requirements.txt
+├── Procfile
+├── render.yaml
+├── templates/
+├── static/
+├── assets/
+└── tests/
