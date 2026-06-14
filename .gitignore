@@ -1,10 +1,26 @@
+# Virtual Environment
 venv/
+.venv/
+env/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
+# Database
+*.db
 expenses.db
+instance/
 
+# Environment Variables
 .env
 .env.local
 
+# IDE
 .vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
