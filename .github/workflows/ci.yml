@@ -1,0 +1,48 @@
+name: CI Pipeline
+
+# Trigger on Push and Pull Request to main branch
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Check out the code from the repository
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Set up Python 3.9 (Stable version)
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+
+    # 3. Install Dependencies
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcairo2-dev pkg-config python3-dev
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest flake8
+
+    # 4. Lint with Flake8
+    # We ignore "line too long" (E501) to keep the build green for now
+    - name: Lint with Flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    # 5. Run Tests
+    # This automatically finds and runs 'test_routes.py'
+    - name: Run Tests with Pytest
+      run: |
+        pytest
