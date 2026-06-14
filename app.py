@@ -12,7 +12,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
-from groq import Groq
+
 
 # --- CONFIGURATION ---
 app = Flask(__name__)
@@ -23,13 +23,6 @@ _RATES_CACHE = {
     "rates": {}
 }
 CACHE_TTL = 60 * 60  # 1 hour
-
-# Initialize Groq Client (Ensure API Key is set)
-# Ideally, use os.environ.get("GROQ_API_KEY")
-groq_client = Groq(
-    api_key="YOUR_GROQ_API_KEY_HERE" 
-)
-
 # --- DATABASE HELPERS ---
 def get_db_connection():
     conn = sqlite3.connect('expenses.db')
@@ -661,6 +654,7 @@ def search_expenses():
         'sort_by': sort_by,
         'sort_order': sort_order
     }
+    user_categories = get_user_categories(session['user_id'])
     
     return render_template('expenses.html', expenses=expenses_list, categories=user_categories, filters=filters, is_filtered=True)
 
@@ -1089,73 +1083,6 @@ def bulk_update_category():
     conn.close()
     
     return jsonify({'success': True})
-
-# --- CHATBOT LOGIC ---
-def get_user_financial_context(user_id):
-    conn = get_db_connection()
-    
-    total_usd = conn.execute(
-        "SELECT COALESCE(SUM(amount_usd), 0) FROM expenses WHERE user_id = ?", (user_id,)
-    ).fetchone()[0]
-    
-    month_start = datetime.now().replace(day=1).strftime('%Y-%m-%d')
-    monthly_usd = conn.execute(
-        "SELECT COALESCE(SUM(amount_usd), 0) FROM expenses WHERE user_id = ? AND date >= ?",
-        (user_id, month_start)
-    ).fetchone()[0]
-
-    categories = conn.execute(
-        "SELECT category, SUM(amount_usd) as total FROM expenses WHERE user_id = ? GROUP BY category",
-        (user_id,)
-    ).fetchall()
-    
-    budgets = conn.execute("SELECT category, amount_usd FROM budgets WHERE user_id = ?", (user_id,)).fetchall()
-    conn.close()
-
-    return {
-        "total_expenses_usd": round(total_usd, 2),
-        "monthly_expenses_usd": round(monthly_usd, 2),
-        "categories": {row["category"]: round(row["total"], 2) for row in categories},
-        "budgets": {row["category"]: round(row["amount_usd"], 2) for row in budgets},
-    }
-
-@app.route('/chatbot', methods=['POST'])
-def chatbot():
-    if 'user_id' not in session:
-        return {"reply": "Unauthorized"}, 401
-
-    data = request.get_json()
-    user_message = data.get("message", "").strip()
-
-    if not user_message:
-        return {"reply": "Please enter a message."}
-
-    context = get_user_financial_context(session['user_id'])
-    system_prompt = f"""
-    You are a personal finance assistant.
-    User data (USD):
-    - Total expenses: {context['total_expenses_usd']}
-    - Monthly expenses: {context['monthly_expenses_usd']}
-    - Category totals: {context['categories']}
-    - Budgets: {context['budgets']}
-    Rules: Do not invent data. Answer clearly.
-    """
-
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0.4,
-            max_tokens=300
-        )
-        return {"reply": response.choices[0].message.content}
-    except Exception as e:
-        print(e)
-        return {"reply": "AI service error. Try again later."}
-
 # ================= NEW: SPLITWISE FEATURES =================
 
 @app.route('/groups')
